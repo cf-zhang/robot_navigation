@@ -36,6 +36,7 @@
 
 #include <nav_2d_msgs/Pose2DStamped.h>
 #include <stdexcept>
+#include <exception>
 #include <string>
 #include <memory>
 
@@ -43,25 +44,26 @@
  * The nav_core2 Planning Exception Hierarchy!!
  * (with arbitrary integer result codes)
  **************************************************
- *
- * 0 CostmapException
+ *   NavCore2Exception
+ * 0   CostmapException
  * 1     CostmapSafetyException
- * 2         CostmapDataLagException
- * 3 PlannerException
+ * 2       CostmapDataLagException
+ * 3   PlannerException
  * 4     GlobalPlannerException
- * 5         InvalidStartPoseException
- * 6             StartBoundsException
- * 7             OccupiedStartException
- * 8         InvalidGoalPoseException
- * 9             GoalBoundsException
- * 10            OccupiedGoalException
- * 11        NoGlobalPathException
- * 12        GlobalPlannerTimeoutException
+ * 5       InvalidStartPoseException
+ * 6         StartBoundsException
+ * 7         OccupiedStartException
+ * 8       InvalidGoalPoseException
+ * 9         GoalBoundsException
+ * 10        OccupiedGoalException
+ * 11      NoGlobalPathException
+ * 12      GlobalPlannerTimeoutException
  * 13    LocalPlannerException
- * 14        IllegalTrajectoryException
- * 15        NoLegalTrajectoriesException
+ * 14      IllegalTrajectoryException
+ * 15      NoLegalTrajectoriesException
  * 16    PlannerTFException
  *
+ * -1 Unknown
  **************************************************/
 
 namespace nav_core2
@@ -95,11 +97,47 @@ inline std::string poseToString(const nav_2d_msgs::Pose2DStamped& pose)
          + " : " + pose.header.frame_id + ")";
 }
 
+class NavCore2Exception: public std::runtime_error
+{
+public:
+  explicit NavCore2Exception(const std::string& description, int result_code)
+    : std::runtime_error(description), result_code_(result_code) {}
+  int getResultCode() const { return result_code_; }
+protected:
+  int result_code_;
+};
+
+using NavCore2ExceptionPtr = std::exception_ptr;
+
+/**
+ * @brief Handy function for getting the result code
+ */
+inline int getResultCode(const NavCore2ExceptionPtr& e_ptr)
+{
+  if (e_ptr == nullptr)
+  {
+    return -1;
+  }
+  try
+  {
+    std::rethrow_exception(e_ptr);
+  }
+  catch (const NavCore2Exception& e)
+  {
+    return e.getResultCode();
+  }
+  catch (...)
+  {
+    // Will end up here if current_exception returned a non-NavCore2Exception
+    return -1;
+  }
+}
+
 /**
  * @class CostmapException
  * @brief Extensible exception class for all costmap-related problems
  */
-class CostmapException: public std::runtime_error
+class CostmapException: public NavCore2Exception
 {
 public:
   explicit CostmapException(const std::string& description, int result_code = COSTMAPEXCEPTION) :
@@ -141,7 +179,7 @@ public:
  * @class PlannerException
  * @brief Parent type of all exceptions defined within
  */
-class PlannerException: public std::runtime_error
+class PlannerException: public NavCore2Exception
 {
 public:
   explicit PlannerException(const std::string& description, int result_code = PLANNEREXCEPTION) :
